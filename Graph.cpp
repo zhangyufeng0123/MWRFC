@@ -249,7 +249,7 @@ void Graph::CalculateWRFCMax() {
 }
 
 void Graph::ReduceGraph() {
-    int *head = new int[max_WRFCMax - lower_bound + 1];
+    int *head = new int[max_WRFCMax + 1];
     int *nxt = new int[n];
     int *colorful_d = new int[attr_size];
     int **colorful_r = new int *[attr_size];
@@ -297,12 +297,13 @@ void Graph::ReduceGraph() {
             for (int i = 1; i < attr_size; i++) {
                 min_colorful_degree = min(min_colorful_degree, colorful_d[i]);
             }
+            printf("%d ", min_colorful_degree);
             WRFCMax[u] = 0;
             for (int i = 0; i < attr_size; i++) {
                 int number_vertices = min(min_colorful_degree + delta, colorful_d[i]);
                 for (int w = max_weight; w > 0; w--) {
                     if (number_vertices > 0) {
-                        WRFCMax[i] += w * min(number_vertices, nums[i][w]);
+                        WRFCMax[u] += w * min(number_vertices, nums[i][w]);
                         number_vertices -= nums[i][w];
                     } else {
                         break;
@@ -312,6 +313,7 @@ void Graph::ReduceGraph() {
             if (WRFCMax[u] > lower_bound) left.emplace_back(u);
         }
     }
+    printf("\n");
 
     int start_pos = 0;
     for (int i = 0; i < n; i++) {
@@ -328,7 +330,8 @@ void Graph::ReduceGraph() {
             offset[i] = pend[i] = 0;
         }
     }
-    delete[] colorful_r;
+    for (int i = 0; i < attr_size; i++)
+        delete[] colorful_r[i];
     delete[] colorful_d;
     delete[] head;
     delete[] nxt;
@@ -849,7 +852,7 @@ void Graph::prepareSearch() {
 
 
             for (int j = 0; j < attr_size; j++) {
-                delete[] index_value[i];
+                delete[] index_value[j];
             }
             delete[] index_value;
             index_value = nullptr;
