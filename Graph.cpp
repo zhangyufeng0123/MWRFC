@@ -169,7 +169,7 @@ void Graph::SetColor() {
                 }
             }
             for (int j = 0;; j++) {
-                if (cvis[j]) {
+                if (!cvis[j]) {
                     color[u] = j;
                     if (j > max_color) max_color = j;
                     break;
@@ -190,49 +190,49 @@ void Graph::SetColor() {
 }
 
 void Graph::CalculateWRFCMax() {
-    int **colorful_d = new int *[n];
-    int ***colorful_r = new int **[n];
+    int *colorful_d = new int [n];
+    int **colorful_r = new int *[n];
     WRFCMax = new int[n];
 
     for (int i = 0; i < n; i++) {
-        colorful_d[i] = new int[attr_size];
-        for (int j = 0; j < attr_size; j++) colorful_d[i][j] = 0;
+        colorful_r[i] = new int[max_color];
     }
 
+    vector<vector<int>> nums(attr_size, vector<int>(max_weight + 1, 0));
     for (int i = 0; i < n; i++) {
-        colorful_r[i] = new int *[attr_size];
+
+        for (int j = 0; j < attr_size; j++) colorful_d[i] = 0;
         for (int j = 0; j < attr_size; j++) {
-            colorful_r[i][j] = new int[max_color];
-            for (int k = 0; k < max_color; k++) {
-                colorful_r[i][j][k] = 0;
+            for (int jj = 0; jj < max_color; jj++) {
+                colorful_r[j][jj] = 0;
             }
         }
-    }
+        for (int j = 0; j < attr_size; j++) {
+            fill(nums[j].begin(), nums[j].end(), 0);
+        }
 
-    for (int i = 0; i < n; i++) {
-        colorful_d[i][attribute[i]] = 1;
-        colorful_r[i][attribute[i]][color[i]] = weight[i];
-        vector<vector<int>> nums(attr_size, vector<int>(max_weight + 1, 0));
+        colorful_d[attribute[i]] = 1;
+        colorful_r[attribute[i]][color[i]] = weight[i];
         nums[attribute[i]][weight[i]]++;
         for (int j = offset[i]; j < offset[i + 1]; j++) {
             int neighbor = edge_list[j];
-            if (colorful_r[i][attribute[neighbor]][color[neighbor]] == 0) {
-                colorful_d[i][attribute[neighbor]]++;
+            if (colorful_r[attribute[neighbor]][color[neighbor]] == 0) {
+                colorful_d[attribute[neighbor]]++;
             }
-            if (colorful_r[i][attribute[neighbor]][color[neighbor]] < weight[neighbor]) {
-                nums[attribute[neighbor]][colorful_r[i][attribute[neighbor]][color[neighbor]]]--;
+            if (colorful_r[attribute[neighbor]][color[neighbor]] < weight[neighbor]) {
+                nums[attribute[neighbor]][colorful_r[attribute[neighbor]][color[neighbor]]]--;
                 nums[attribute[neighbor]][weight[neighbor]]++;
-                colorful_r[i][attribute[neighbor]][color[neighbor]] = weight[neighbor];
+                colorful_r[attribute[neighbor]][color[neighbor]] = weight[neighbor];
             }
         }
 
-        int min_colorful_degree = colorful_d[i][0];
+        int min_colorful_degree = colorful_d[0];
         for (int j = 1; j < attr_size; j++) {
-            min_colorful_degree = min(min_colorful_degree, colorful_d[i][j]);
+            min_colorful_degree = min(min_colorful_degree, colorful_d[j]);
         }
         WRFCMax[i] = 0;
         for (int j = 0; j < attr_size; j++) {
-            int number_vertices = min(min_colorful_degree + delta, colorful_d[i][j]);
+            int number_vertices = min(min_colorful_degree + delta, colorful_d[j]);
             for (int w = max_weight; w >= 1; w--) {
                 if (number_vertices > 0) {
                     WRFCMax[i] += w * min(number_vertices, nums[j][w]);
@@ -249,7 +249,7 @@ void Graph::CalculateWRFCMax() {
 }
 
 void Graph::ReduceGraph() {
-    int *head = new int[max_WRFCMax + 1];
+    int *head = new int[max_WRFCMax - lower_bound + 1];
     int *nxt = new int[n];
     int *colorful_d = new int[attr_size];
     int **colorful_r = new int *[attr_size];
@@ -355,6 +355,7 @@ void Graph::Baseline() {
     TimeBegin = clock();
     BronKerbosch(R, V);
     TimeEnd = clock();
+    printf("BASELINE METHOD max result is %d\n", max_result);
     printf("BASELINE METHOD 消耗的时间为%lf\n", double(TimeEnd - TimeBegin) / CLOCKS_PER_SEC);
     printf("BASELINE METHOD 搜索节点数量为%lld\n\n", branches);
 }
@@ -363,6 +364,13 @@ void Graph::Baseline() {
 void Graph::BronKerbosch(vector<int> &R, vector<int> &C) {
     branches++;
     if (C.empty()) {
+        int temp = CalculateResult(R);
+        if (temp > max_result) {
+            for (auto r : R) {
+                printf("%d %d %d \n", r, attribute[r], weight[r]);
+            }
+            printf("\n");
+        }
         max_result = max(max_result, CalculateResult(R));
         return;
     }
@@ -628,7 +636,7 @@ void Graph::HeuristicAlgorithm() {
             for (int j = 1; j <= ii; j++) {
                 hhead[j] = n;
             }
-            int MTmp = weight[u], idxx = attribute[u];
+            int MTmp = 1, idxx = attribute[u], wTmp = weight[u];
             int T = 1, mi = -1;
             while (T++) {
                 if (mi != -1 && T - mi >= delta) break;
@@ -645,6 +653,7 @@ void Graph::HeuristicAlgorithm() {
                                 f++;
                                 F++;
                                 MTmp++;
+                                wTmp += weight[v];
                                 Flag[v] = index;
                                 break;
                             }
@@ -656,7 +665,7 @@ void Graph::HeuristicAlgorithm() {
                 }
                 if (!f) break;
             }
-            lower_bound = max(lower_bound, MTmp);
+            lower_bound = max(lower_bound, wTmp);
         }
     }
 }
@@ -892,6 +901,7 @@ void Graph::Last() {
 
     // 搜索
     time_begin = clock();
+    max_result = lower_bound;
     prepareSearch();
     time_end = clock();
     time_all += double(time_end - time_begin) / CLOCKS_PER_SEC;
