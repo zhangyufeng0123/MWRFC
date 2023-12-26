@@ -679,20 +679,23 @@ void Graph::SortWeight(vector<int> &nums) {
     int *head = new int[max_weight + 1];
     int *nxt = new int[int(nums.size())];
 
-    for (int i = max_weight; i >= 0; i--) head[i] = n;
+    vector<int> t(max_weight + 1, n);
+    for(int i = 1; i <= max_weight; i++) head[i] = n;
     for (int i = 0; i < int(nums.size()); i++) {
         nxt[i] = head[weight[nums[i]]];
-        head[weight[i]] = i;
+        head[weight[nums[i]]] = i;
     }
 
     int index = 0;
-    for (int w = max_weight; w >= 0; w--) {
+    for (int w = max_weight; w > 0; w--) {
         for (int jj = head[w]; jj != n; jj = nxt[jj]) {
-            int u = jj;
+            int u = nums[jj];
             res_tmp[index++] = u;
         }
     }
     nums = std::move(res_tmp);
+    delete[] head;
+    delete[] nxt;
 }
 
 void Graph::DivideParts() {
@@ -762,8 +765,6 @@ void Graph::DivideParts() {
 }
 
 void Graph::MergeParts() {
-    if (groups != nullptr) delete[] groups;
-
     groups = new int ***[attr_size];
     for (int i = 0; i < attr_size; i++) {
         groups[i] = new int **[divided_vertices[i].size()];
@@ -842,7 +843,7 @@ void Graph::prepareSearch() {
     max_result = lower_bound;
     vector<int> R;
     for (int i = 0; i < n; i++) {
-        if (vis[i]) {
+        if (WRFCMax[i] > max_result && vis[i]) {
             component.clear();
             GetConnectedComponent(i, vis);
             DivideParts();
@@ -856,6 +857,12 @@ void Graph::prepareSearch() {
             }
             delete[] index_value;
             index_value = nullptr;
+            for (int ii = 0; ii < attr_size; ii++) {
+                for (int j = 0; j < int(divided_vertices[ii].size()); j++) {
+                    delete[] groups[ii][j];
+                }
+                delete[] groups[ii];
+            }
         }
     }
 }
