@@ -407,6 +407,7 @@ void Graph::BronKerbosch(vector<int> &R, vector<int> &C) {
 }
 
 void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int flag, int N) {
+    branches++;
     if (aIdx == 0) N++;
     if (C.empty() || (N - flag) >= delta && flag != -1) {
         result = max(result, CMax);
@@ -443,6 +444,7 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int 
                     newP.emplace_back(C[j]);
                 }
             }
+
             for (int j = offset[v]; j < pend[v]; j++) {
                 nvis[edge_list[j]] = 0;
             }
@@ -462,7 +464,7 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int 
 
 int Graph::GetUpperBoundSpeed(int attr, vector<int> &P) {
     for (int i = 0; i < attr_size; i++) {
-        memset(index_value[i], 0, sizeof(index_value[i]));
+        memset(index_value[i], 0, sizeof(int) * parts_size[i]);
     }
     for (auto v: P) {
         index_value[attribute[v]][index1[v]] += index2[v];
@@ -792,6 +794,8 @@ void Graph::MergeParts() {
             for (int j = 1; j < tmp_index2; j++) {
                 int mtmp = j + index2[v];
                 int commonNeighbor = tmp & j;
+
+                groups[i][tmp_index1][mtmp] = new int[parts_len];
                 if (commonNeighbor == 0) {
                     // 说明没有公共邻居
                     for (int e = 0; e <= groups[i][tmp_index1][j][0]; e++) {
@@ -859,6 +863,9 @@ void Graph::prepareSearch() {
             index_value = nullptr;
             for (int ii = 0; ii < attr_size; ii++) {
                 for (int j = 0; j < int(divided_vertices[ii].size()); j++) {
+                    for (int k = 1; k < int(pow(2, int(divided_vertices[ii][j]))); k++) {
+                        delete[] groups[ii][j][k];
+                    }
                     delete[] groups[ii][j];
                 }
                 delete[] groups[ii];
