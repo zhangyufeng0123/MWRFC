@@ -28,6 +28,7 @@ Graph::Graph(const string &_dir, int attrs, int delta) {
     WRFCMax = nullptr;
     nvis = nullptr;
     groups = nullptr;
+    index_value = nullptr;
 
     left.clear();
     component.clear();
@@ -89,8 +90,8 @@ void Graph::ReadGraph() {
     for (int i = 0; i < m; i++) {
         infile >> from >> to;
         if (from == to) continue;   // 取消自环
-        edges[from].emplace_back(to);
-        edges[to].emplace_back(from);
+        edges[from].push_back(to);
+        edges[to].push_back(from);
     }
 
     for (int i = 1; i <= n; i++) {
@@ -297,7 +298,6 @@ void Graph::ReduceGraph() {
             for (int i = 1; i < attr_size; i++) {
                 min_colorful_degree = min(min_colorful_degree, colorful_d[i]);
             }
-            printf("%d ", min_colorful_degree);
             WRFCMax[u] = 0;
             for (int i = 0; i < attr_size; i++) {
                 int number_vertices = min(min_colorful_degree + delta, colorful_d[i]);
@@ -310,10 +310,9 @@ void Graph::ReduceGraph() {
                     }
                 }
             }
-            if (WRFCMax[u] > lower_bound) left.emplace_back(u);
+            if (WRFCMax[u] > lower_bound) left.push_back(u);
         }
     }
-    printf("\n");
 
     int start_pos = 0;
     for (int i = 0; i < n; i++) {
@@ -332,6 +331,7 @@ void Graph::ReduceGraph() {
     }
     for (int i = 0; i < attr_size; i++)
         delete[] colorful_r[i];
+    delete[] colorful_r;
     delete[] colorful_d;
     delete[] head;
     delete[] nxt;
@@ -339,7 +339,6 @@ void Graph::ReduceGraph() {
 
 void Graph::Baseline() {
     clock_t TimeBegin, TimeEnd;
-    double TimeAll = 0;
     printf("THERE IS BASELINE METHOD \n");
     printf("当前属性的维度d=%d, delta=%d\n", attr_size, delta);
 
@@ -383,18 +382,18 @@ void Graph::BronKerbosch(vector<int> &R, vector<int> &C) {
     newR.clear();
     newP.clear();
 
-    for (auto r: R) newR.emplace_back(r);
+    for (auto r: R) newR.push_back(r);
 
     for (int i = 0; i < len; i++) {
         int cur = C[i];
         newP.clear();
-        newR.emplace_back(cur);
+        newR.push_back(cur);
         for (int j = i + 1; j < len; j++) {
             nvis[C[j]] = 1;
         }
 
         for (int j = offset[cur]; j < offset[cur + 1]; j++) {
-            if (nvis[edge_list[j]]) newP.emplace_back(edge_list[j]);
+            if (nvis[edge_list[j]]) newP.push_back(edge_list[j]);
         }
 
         for (int j = i + 1; j < len; j++) {
@@ -409,14 +408,27 @@ void Graph::BronKerbosch(vector<int> &R, vector<int> &C) {
 void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int flag, int N) {
     branches++;
     if (aIdx == 0) N++;
-    if (C.empty() || (N - flag) >= delta && flag != -1) {
-        result = max(result, CMax);
+    if (C.empty() || (N - flag >= delta && flag != -1)) {
+        if (CMax > max_result) {
+            for (auto r : R) {
+                if (attribute[r] == 0) {
+                    cout << r << "(" << attribute[r] << ")[" << weight[r] << "] ";
+                }
+            }
+            cout << endl;
+            for (auto r : R) {
+                if (attribute[r] == 1) {
+                    cout << r << "(" << attribute[r] << ")[" << weight[r] << "] ";
+                }
+            }
+            cout << endl;
+        }
+        max_result = max(max_result, CMax);
         return;
     }
 
     int len = int(C.size()), idx = 0;
     vector<int> newR(R), newP;
-    newR.clear();
     newP.clear();
     for (int i = 0; i < len - idx; i++) {
         if (attribute[C[i]] == aIdx) {
@@ -432,16 +444,16 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int 
     } else {
         for (int i = len - 1; i >= len - idx; i--) {
             int v = C[i];
-            newR.emplace_back(v);
+            newR.push_back(v);
             newP.clear();
 
             for (int j = offset[v]; j < pend[v]; j++) {
                 nvis[edge_list[j]] = 1;
             }
 
-            for (int j = i - 1; j >= 0; j--) {
-                if (nvis[C[j]]) {
-                    newP.emplace_back(C[j]);
+            for (int j = 0; j < i; j++) {
+                if (nvis[C[j]] && WRFCMax[C[j]] > max_result) {
+                    newP.push_back(C[j]);
                 }
             }
 
@@ -466,6 +478,10 @@ int Graph::GetUpperBoundSpeed(int attr, vector<int> &P) {
     for (int i = 0; i < attr_size; i++) {
         memset(index_value[i], 0, sizeof(int) * parts_size[i]);
     }
+    sort(P.begin(), P.end(), [&](int a, int b) {
+        return weight[a] > weight[b];
+    });
+
     for (auto v: P) {
         index_value[attribute[v]][index1[v]] += index2[v];
     }
@@ -480,7 +496,7 @@ int Graph::GetUpperBoundSpeed(int attr, vector<int> &P) {
 
     int length = attr_len[0];
     for (int i = 1; i < attr_size; i++) {
-        length = min(length, attr_len[0]);
+        length = min(length, attr_len[i]);
     }
     int upper_bound = 0;
     for (int i = 0; i < attr_size; i++) {
@@ -505,11 +521,11 @@ int Graph::GetUpperBoundSpeed(int attr, vector<int> &P) {
 int Graph::GetUpperBoundNormal(int attr, vector<int> &P) {
     vector<vector<int>> W(attr_size);
     for (int i = 0; i <= attr; i++) {
-        W[i].emplace_back(0);
+        W[i].push_back(0);
     }
 
     for (auto v : P) {
-        W[attribute[v]].emplace_back(weight[v]);
+        W[attribute[v]].push_back(weight[v]);
     }
 
     for (int i = 0; i < attr_size; i++) {
@@ -547,7 +563,7 @@ void Graph::GetConnectedComponent(int root, int *vis) {
     while (!s.empty()) {
         int cur = s.top();
         s.pop();
-        component.emplace_back(cur);
+        component.push_back(cur);
         for (int i = offset[cur]; i < pend[cur]; i++) {
             if (vis[edge_list[i]]) {
                 s.push(edge_list[i]);
@@ -578,7 +594,7 @@ int Graph::CalculateResult(vector<int> &V) {
 
     vector<vector<int>> vertices(attr_size);
     for (auto v: V) {
-        vertices[attribute[v]].emplace_back(v);
+        vertices[attribute[v]].push_back(v);
     }
 
     for (auto &vertex: vertices) {
@@ -593,7 +609,7 @@ int Graph::CalculateResult(vector<int> &V) {
     }
 
     for (const auto &vertex: vertices) {
-        for (int i = 0; i < min(min_threshold, int(vertex.size())); i++) {
+        for (int i = 0; i < min(min_threshold + delta, int(vertex.size())); i++) {
             current_result += weight[vertex[i]];
         }
     }
@@ -635,7 +651,7 @@ void Graph::HeuristicAlgorithm() {
             vector<int> t(attr_size, 0);
             for (int i = ii; i >= 1; i--) {
                 for (int j = hhead[i]; j != n; j = nnxt[j]) {
-                    P[attribute[j]].emplace_back(j);
+                    P[attribute[j]].push_back(j);
                 }
             }
             for (int j = 1; j <= ii; j++) {
@@ -704,15 +720,15 @@ void Graph::DivideParts() {
     divided_vertices.resize(attr_size);
 
     for (auto v: component) {
-        divided_vertices[attribute[v]].emplace_back(v);
+        divided_vertices[attribute[v]].push_back(v);
     }
 
     for (int i = 0; i < attr_size; i++) {
         SortWeight(divided_vertices[i]);
     }
 
-    if (int(component.size()) < 100) parts_len = 20;
-    else if (int(component.size()) < 1000) parts_len = 15;
+    if (int(component.size()) < 100) parts_len = 15;
+    else if (int(component.size()) < 1000) parts_len = 13;
     else parts_len = 10;
 
     two.resize(parts_len + 1);
@@ -803,7 +819,7 @@ void Graph::MergeParts() {
                     }
                 } else {
                     for (int e = 0; e <= groups[i][tmp_index1][j][0]; e++) {
-                        groups[i][tmp_index1][mtmp][e + 1] = groups[i][tmp_index1][j][e];
+                        groups[i][tmp_index1][mtmp][e] = groups[i][tmp_index1][j][e];
                     }
                     int tmp_len = groups[i][tmp_index1][commonNeighbor][0];
                     for (int e = 1; e < tmp_len; e++) {
@@ -815,7 +831,7 @@ void Graph::MergeParts() {
                                 weight[v] + groups[i][tmp_index1][commonNeighbor][tmp_len],
                                 groups[i][tmp_index1][j][tmp_len + 1]);
                     } else {
-                        groups[i][tmp_index1][j][0] = tmp_len + 1;
+                        groups[i][tmp_index1][mtmp][0] = tmp_len + 1;
                         groups[i][tmp_index1][mtmp][tmp_len + 1] =
                                 weight[v] + groups[i][tmp_index1][commonNeighbor][tmp_len];
                     }
@@ -852,9 +868,7 @@ void Graph::prepareSearch() {
             GetConnectedComponent(i, vis);
             DivideParts();
             MergeParts();
-            R.clear();
             MWRFCSearch(R, component, 0, 0, -1, 0);
-
 
             for (int j = 0; j < attr_size; j++) {
                 delete[] index_value[j];
@@ -862,8 +876,9 @@ void Graph::prepareSearch() {
             delete[] index_value;
             index_value = nullptr;
             for (int ii = 0; ii < attr_size; ii++) {
-                for (int j = 0; j < int(divided_vertices[ii].size()); j++) {
-                    for (int k = 1; k < int(pow(2, int(divided_vertices[ii][j]))); k++) {
+                for (int j = 1; j <= parts_size[ii]; j++) {
+                    for (int k = 1; k < two[parts_len]; k++) {
+                        if (groups[ii][j][k] == nullptr) break;
                         delete[] groups[ii][j][k];
                     }
                     delete[] groups[ii][j];

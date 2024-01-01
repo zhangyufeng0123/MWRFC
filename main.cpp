@@ -1,7 +1,7 @@
 #include "Graph.h"
 
 int main(int argv, char** argc) {
-    system("chcp 65001");
+//    system("chcp 65001");
     if (argv != 3) {
         cout << "参数数量有误" << endl;
         return 0;
