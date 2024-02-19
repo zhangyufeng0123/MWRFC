@@ -12,9 +12,9 @@ int main(int argv, char** argc) {
     }
     string dir = string("../datasets/") + argc[1];
     for (int delta = 1; delta <= 5; delta++) {
-        for (int attr_size = 2; attr_size <= 2; attr_size++) {
-//            string base_dir = dir + "-attr.in";
-            string base_dir = dir;
+        for (int attr_size = 2; attr_size <= 5; attr_size++) {
+            string base_dir = dir + '-' + to_string(attr_size) +  ".in";
+//            string base_dir = dir;
             Graph graph(base_dir, attr_size, delta);
             if (strcmp(argc[2], "base") == 0) {
                 graph.Baseline();

@@ -59,6 +59,7 @@ public:
     void CalculateWRFCMax();
     void ReduceGraph();
     void BronKerbosch(vector<int>&, vector<int>&);
+    void MWRFCSearch(vector<int>&, vector<int> &, vector<int> &);
     void MWRFCSearch(vector<int> &, vector<int> &, int, int, int, int);
     void GetConnectedComponent(int root, int *vis);
     int CalculateResult(vector<int> &V);

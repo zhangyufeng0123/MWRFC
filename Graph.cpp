@@ -156,6 +156,7 @@ void Graph::SetColor() {
     }
 
     delete[] degree;
+    degree = nullptr;
 
     for (int i = 0; i < n; i++) cvis[i] = 0;
     for (int i = 0; i < n; i++) color[i] = n;
@@ -188,6 +189,9 @@ void Graph::SetColor() {
     delete[] head;
     delete[] nxt;
     delete[] cvis;
+    head = nullptr;
+    nxt = nullptr;
+    cvis = nullptr;
 }
 
 void Graph::CalculateWRFCMax() {
@@ -247,6 +251,8 @@ void Graph::CalculateWRFCMax() {
     }
     delete[] colorful_d;
     delete[] colorful_r;
+    colorful_d = nullptr;
+    colorful_r = nullptr;
 }
 
 void Graph::ReduceGraph() {
@@ -329,12 +335,18 @@ void Graph::ReduceGraph() {
             offset[i] = pend[i] = 0;
         }
     }
-    for (int i = 0; i < attr_size; i++)
+    for (int i = 0; i < attr_size; i++){
         delete[] colorful_r[i];
+        colorful_r[i] = nullptr;
+    }
     delete[] colorful_r;
     delete[] colorful_d;
     delete[] head;
     delete[] nxt;
+    colorful_r = nullptr;
+    colorful_d = nullptr;
+    head = nullptr;
+    nxt = nullptr;
 }
 
 void Graph::Baseline() {
@@ -367,12 +379,6 @@ void Graph::BronKerbosch(vector<int> &R, vector<int> &C) {
     branches++;
     if (C.empty()) {
         int temp = CalculateResult(R);
-        if (temp > max_result) {
-            for (auto r : R) {
-                printf("%d %d %d \n", r, attribute[r], weight[r]);
-            }
-            printf("\n");
-        }
         max_result = max(max_result, CalculateResult(R));
         return;
     }
@@ -409,20 +415,6 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int 
     branches++;
     if (aIdx == 0) N++;
     if (C.empty() || (N - flag >= delta && flag != -1)) {
-        if (CMax > max_result) {
-            for (auto r : R) {
-                if (attribute[r] == 0) {
-                    cout << r << "(" << attribute[r] << ")[" << weight[r] << "] ";
-                }
-            }
-            cout << endl;
-            for (auto r : R) {
-                if (attribute[r] == 1) {
-                    cout << r << "(" << attribute[r] << ")[" << weight[r] << "] ";
-                }
-            }
-            cout << endl;
-        }
         max_result = max(max_result, CMax);
         return;
     }
@@ -452,8 +444,9 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int 
             }
 
             for (int j = 0; j < i; j++) {
-                if (nvis[C[j]] && WRFCMax[C[j]] > max_result) {
-                    newP.push_back(C[j]);
+                int u = C[j];
+                if (nvis[u] && WRFCMax[u] > max_result) {
+                    newP.push_back(u);
                 }
             }
 
@@ -587,6 +580,8 @@ void Graph::GetConnectedComponent(int root, int *vis) {
     }
     delete[] head;
     delete[] nxt;
+    head = nullptr;
+    nxt = nullptr;
 }
 
 int Graph::CalculateResult(vector<int> &V) {
@@ -714,6 +709,8 @@ void Graph::SortWeight(vector<int> &nums) {
     nums = std::move(res_tmp);
     delete[] head;
     delete[] nxt;
+    head = nullptr;
+    nxt = nullptr;
 }
 
 void Graph::DivideParts() {
@@ -841,14 +838,94 @@ void Graph::MergeParts() {
     }
 }
 
+void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, vector<int> &T) {
+    branches++;
+    int Ma = T[0], Mi = T[0];
+    for (int i = 1; i < attr_size; i++) {
+        Ma = max(Ma, T[i]);
+        Mi = min(Mi, T[i]);
+    }
+
+    int len = int(C.size());
+    vector<int> newR, newP, newT;
+    newR.clear(); newP.clear(); newT.clear();
+    for(auto r : R) newR.emplace_back(r);
+    for(auto t : T) newT.emplace_back(t);
+    vector<int> nP; nP.clear();
+
+    for(int i = 0; i < len; i++){
+        int cur = C[i];
+        if(Ma - Mi == delta && T[attribute[cur]] == Ma){
+            nP.emplace_back(cur);
+            max_result = max(max_result, int(R.size()));
+            continue;
+        }
+
+        newP.clear();
+        newR.emplace_back(cur);
+        ++newT[attribute[cur]];
+
+        for(int j = offset[cur]; j < pend[cur]; j++){
+            nvis[edge_list[j]] = 1;
+        }
+
+        int j1 = i + 1, j2 = 0, len_np = nP.size();
+        while(j1 < len && j2 < nP.size()){
+            if(RFCMax[C[j1]] > RFCMax[nP[j2]]){
+                if(nvis[C[j1]]) newP.emplace_back(C[j1]);
+                j1++;
+            }else{
+                if(nvis[nP[j2]]) newP.emplace_back(nP[j2]);
+                j2++;
+            }
+        }
+
+        for(int j = j1; j < len; j++){
+            if(nvis[C[j]]) newP.emplace_back(C[j]);
+        }
+
+        for(int j = j2; j < len_np; j++){
+            if(nvis[nP[j]]) newP.emplace_back(nP[j]);
+        }
+
+        for(int j = offset[cur]; j < pend[cur]; j++){
+            nvis[edge_list[j]] = 0;
+        }
+
+        if(int(newP.size()) + int(newR.size()) <= max_result){
+            newR.pop_back();
+            --newT[attribute[cur]];
+            continue;
+        }
+
+        vector<int> CntT(attr_size, 0);
+        for(auto u : newP) CntT[attribute[u]]++;
+        int mi = newT[0] + CntT[0];
+        for(int j = 1; j < attr_size; j++) mi = min(mi, newT[j] + CntT[j]);
+        int rfc = 0;
+        for(int j = 0; j < attr_size; j++) rfc += min(mi + delta, newT[j] + CntT[j]);
+        if(rfc <= max_result){
+            --newT[attribute[cur]];
+            newR.pop_back();
+            continue;
+        }
+        if(!newP.empty()) MRFCSearch(newR, newP, newT);
+        else max_result = max(max_result, int(newR.size()));
+        newT[attribute[cur]]--;
+        newR.pop_back();
+    }
+}
+
 void Graph::Middle() {
     // 读取数据
+    clock_t time_begin, time_end;
+    double time_all = 0;
+
+    time_begin = clock();
     ReadGraph();
+    time_end = clock();
+    cout << "read data cost " << double(time_end - time_begin) / CLOCKS_PER_SEC << "s" << endl;
 
-    // 上色
-    SetColor();
-
-    //
 
 
 }
@@ -872,18 +949,23 @@ void Graph::prepareSearch() {
 
             for (int j = 0; j < attr_size; j++) {
                 delete[] index_value[j];
+                index_value[j] = nullptr;
             }
             delete[] index_value;
+            index_value = nullptr;
             index_value = nullptr;
             for (int ii = 0; ii < attr_size; ii++) {
                 for (int j = 1; j <= parts_size[ii]; j++) {
                     for (int k = 1; k < two[parts_len]; k++) {
                         if (groups[ii][j][k] == nullptr) break;
                         delete[] groups[ii][j][k];
+                        groups[ii][j][k] = nullptr;
                     }
                     delete[] groups[ii][j];
+                    groups[ii][j] = nullptr;
                 }
                 delete[] groups[ii];
+                groups[ii] = nullptr;
             }
         }
     }
