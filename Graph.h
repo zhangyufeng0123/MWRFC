@@ -76,6 +76,14 @@ public:
 
     // common
     void SortWeight(vector<int> &);
+
+    int judge(int b) {
+        vector<int> a = {2728,6591,6633,6634,6639,6640,6644,6650,6651,6652,6653,9524,10524,12769,12847,16555};
+        for (auto aa : a){
+            if (b == aa) return true;
+        }
+        return false;
+    }
 };
 
 #endif //MWRFC_GRAPH_H

@@ -75,6 +75,14 @@ Graph::~Graph() {
         delete[] nvis;
         nvis = nullptr;
     }
+    if (groups != nullptr) {
+        delete[] groups;
+        groups = nullptr;
+    }
+    if (index_value != nullptr) {
+        delete[] index_value;
+        index_value = nullptr;
+    }
 }
 
 void Graph::ReadGraph() {
@@ -117,6 +125,9 @@ void Graph::ReadGraph() {
     index1.resize(n);
     index2.resize(n);
     offset[0] = 0;
+    for (int i = 0; i < n; i++) {
+        nvis[i] = 0;
+    }
     for (int i = 0; i <= n - 1; i++) {
         offset[i + 1] = offset[i];
         for (int u: edges[i + 1]) {
@@ -335,6 +346,7 @@ void Graph::ReduceGraph() {
             offset[i] = pend[i] = 0;
         }
     }
+    offset[n] = pend[n];
     for (int i = 0; i < attr_size; i++){
         delete[] colorful_r[i];
         colorful_r[i] = nullptr;
@@ -372,13 +384,20 @@ void Graph::Baseline() {
     printf("BASELINE METHOD max result is %d\n", max_result);
     printf("BASELINE METHOD 消耗的时间为%lf\n", double(TimeEnd - TimeBegin) / CLOCKS_PER_SEC);
     printf("BASELINE METHOD 搜索节点数量为%lld\n\n", branches);
+    printf("BASELINE METHOD 最大节点数量为%d\n\n", result);
 }
 
 
 void Graph::BronKerbosch(vector<int> &R, vector<int> &C) {
     branches++;
     if (C.empty()) {
-        int temp = CalculateResult(R);
+        if (CalculateResult(R) > max_result) {
+            for (int r : R) {
+                cout << r << ' ';
+            }
+            cout << endl;
+            result = max(result, int(R.size()));
+        }
         max_result = max(max_result, CalculateResult(R));
         return;
     }
@@ -415,6 +434,14 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int 
     branches++;
     if (aIdx == 0) N++;
     if (C.empty() || (N - flag >= delta && flag != -1)) {
+        if (max_result < CMax) {
+            result = max(result, int(R.size()));
+            for (int r : R) {
+                cout << r << ' ';
+            }
+            cout << endl;
+
+        }
         max_result = max(max_result, CMax);
         return;
     }
@@ -436,6 +463,10 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, int aIdx, int CMax, int 
     } else {
         for (int i = len - 1; i >= len - idx; i--) {
             int v = C[i];
+            if (R.empty() && judge(v)) {
+                cout << 1 << endl;
+            }
+
             newR.push_back(v);
             newP.clear();
 
@@ -724,8 +755,8 @@ void Graph::DivideParts() {
         SortWeight(divided_vertices[i]);
     }
 
-    if (int(component.size()) < 100) parts_len = 15;
-    else if (int(component.size()) < 1000) parts_len = 13;
+    if (int(component.size()) < 100) parts_len = 20;
+    else if (int(component.size()) < 1000) parts_len = 15;
     else parts_len = 10;
 
     two.resize(parts_len + 1);
@@ -788,8 +819,15 @@ void Graph::MergeParts() {
         }
     }
 
-    int len = int(component.size());
-    vector<int> f(len + 1, 0);
+    for (int i = 0; i < attr_size; i++) {
+        for (int j = 0; j < int(divided_vertices[i].size()); j++) {
+            for (int k = 0; k < two[parts_len]; k++) {
+                groups[i][j][k] = nullptr;
+            }
+        }
+    }
+
+    vector<int> f(n + 1, 0);
     for (int i = 0; i < attr_size; i++) {
         for (int v: divided_vertices[i]) {
             int tmp_index1 = index1[v], tmp_index2 = index2[v];
@@ -871,7 +909,7 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, vector<int> &T) {
 
         int j1 = i + 1, j2 = 0, len_np = nP.size();
         while(j1 < len && j2 < nP.size()){
-            if(RFCMax[C[j1]] > RFCMax[nP[j2]]){
+            if(WRFCMax[C[j1]] > WRFCMax[nP[j2]]){
                 if(nvis[C[j1]]) newP.emplace_back(C[j1]);
                 j1++;
             }else{
@@ -909,7 +947,7 @@ void Graph::MWRFCSearch(vector<int> &R, vector<int> &C, vector<int> &T) {
             newR.pop_back();
             continue;
         }
-        if(!newP.empty()) MRFCSearch(newR, newP, newT);
+        if(!newP.empty()) MWRFCSearch(newR, newP, newT);
         else max_result = max(max_result, int(newR.size()));
         newT[attribute[cur]]--;
         newR.pop_back();
@@ -943,6 +981,7 @@ void Graph::prepareSearch() {
         if (WRFCMax[i] > max_result && vis[i]) {
             component.clear();
             GetConnectedComponent(i, vis);
+
             DivideParts();
             MergeParts();
             MWRFCSearch(R, component, 0, 0, -1, 0);
@@ -955,7 +994,7 @@ void Graph::prepareSearch() {
             index_value = nullptr;
             index_value = nullptr;
             for (int ii = 0; ii < attr_size; ii++) {
-                for (int j = 1; j <= parts_size[ii]; j++) {
+                for (int j = 0; j < parts_size[ii]; j++) {
                     for (int k = 1; k < two[parts_len]; k++) {
                         if (groups[ii][j][k] == nullptr) break;
                         delete[] groups[ii][j][k];
@@ -1013,6 +1052,7 @@ void Graph::Last() {
     cout << "remove vertices cost " << double(time_end - time_begin) / CLOCKS_PER_SEC << "s" << endl;
     cout << "after removing vertices, the left number is " << int(left.size()) << endl;
 
+
     // 搜索
     time_begin = clock();
     max_result = lower_bound;
@@ -1023,4 +1063,5 @@ void Graph::Last() {
 
     cout << "result of speedup version is " << max_result << endl;
     cout << "all time cost " << time_all << endl;
+    cout << "the number of vertices is " << result << endl;
 }
